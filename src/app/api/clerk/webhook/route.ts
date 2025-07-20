@@ -1,6 +1,7 @@
 import { db } from "@/server/db"
 
 export const POST = async (req: Request) => {
+    console.log("trying to create user...")
     const {data} = await req.json()
     console.log("clerk webhook received", data)
 
