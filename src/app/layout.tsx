@@ -29,7 +29,7 @@ export default function RootLayout({
 	return (
         <ClerkProvider>
             <html lang="en" className={`${geist.variable}`} suppressHydrationWarning>
-                <body>
+                <body className="overflow-hidden">
                     <ThemeProvider
                         attribute="class"
                         defaultTheme="system"

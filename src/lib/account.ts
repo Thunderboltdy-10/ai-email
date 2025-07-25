@@ -1,5 +1,5 @@
 import { db } from "@/server/db"
-import type { EmailAddress, EmailMessage, SyncResponse, SyncUpdatedResponse } from "@/types"
+import type { EmailAddress, EmailMessage, SyncDeletedResponse, SyncResponse, SyncUpdatedResponse } from "@/types"
 import axios from "axios"
 import { sub } from "date-fns"
 import { syncEmailsToDatabase } from "./sync-to-db"
@@ -13,7 +13,7 @@ export class Account {
 
     private async startSync() {
         const response = await axios.post<SyncResponse>("https://api.aurinko.io/v1/email/sync", {}, {
-            headers: {
+            headers: {  
                 Authorization: `Bearer ${this.token}`
             },
             params: {
@@ -34,7 +34,21 @@ export class Account {
                 Authorization: `Bearer ${this.token}`
             },
             params
-        })
+        })  
+        return response.data
+    }
+
+    async getDeletedEmails({deltaToken, pageToken}: {deltaToken?: string, pageToken?: string}) {
+        let params: Record<string, string> = {}
+        if (deltaToken) params.deltaToken = deltaToken
+        if (pageToken) params.pageToken = pageToken
+
+        const response = await axios.get<SyncDeletedResponse>("https://api.aurinko.io/v1/email/sync/deleted", {
+            headers: {
+                Authorization: `Bearer ${this.token}`
+            },
+            params
+        })  
         return response.data
     }
 
@@ -46,11 +60,12 @@ export class Account {
                 syncResponse = await this.startSync()
             }
 
-            let storedDeltaToken: string = syncResponse.syncUpdatedToken
+            let storedUpdateDeltaToken: string = syncResponse.syncUpdatedToken
+            let storedDeleteDeltaToken: string = syncResponse.syncDeletedToken
 
-            let updatedResponse = await this.getUpdatedEmails({deltaToken: storedDeltaToken})
-            if (updatedResponse.nextDeltaToken) {
-                storedDeltaToken = updatedResponse.nextDeltaToken
+            let updatedResponse = await this.getUpdatedEmails({deltaToken: storedUpdateDeltaToken})
+            if (updatedResponse.updateDeltaToken) {
+                storedUpdateDeltaToken = updatedResponse.updateDeltaToken
             }
 
             let allEmails : EmailMessage[] = updatedResponse.records
@@ -59,8 +74,8 @@ export class Account {
                 updatedResponse = await this.getUpdatedEmails({pageToken: updatedResponse.nextPageToken})
                 allEmails = allEmails.concat(updatedResponse.records)
 
-                if (updatedResponse.nextDeltaToken) {
-                    storedDeltaToken = updatedResponse.nextDeltaToken
+                if (updatedResponse.updateDeltaToken) { 
+                    storedUpdateDeltaToken = updatedResponse.updateDeltaToken
                 }
             }
 
@@ -68,7 +83,8 @@ export class Account {
 
             return {
                 emails: allEmails,
-                deltaToken: storedDeltaToken
+                updateDeltaToken: storedUpdateDeltaToken,
+                deleteDeltaToken: storedDeleteDeltaToken
             }
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -84,23 +100,23 @@ export class Account {
             where: {accessToken: this.token}
         })
         if (!account) throw new Error("Account not found")
-        if (!account.nextDeltaToken) throw new Error("Account not ready for sync")
+        if (!account.updateDeltaToken) throw new Error("Account not ready for sync")
 
         let response = await this.getUpdatedEmails({
-            deltaToken: account.nextDeltaToken
+            deltaToken: account.updateDeltaToken
         })
-        let storedDeltaToken = account.nextDeltaToken
+        let storedUpdateDeltaToken = account.updateDeltaToken
         let allEmails: EmailMessage[] = response.records
 
-        if (response.nextDeltaToken) {
-            storedDeltaToken = response.nextDeltaToken
+        if (response.updateDeltaToken) {
+            storedUpdateDeltaToken = response.updateDeltaToken
         }
 
         while (response.nextPageToken) {
             response = await this.getUpdatedEmails({pageToken: response.nextPageToken})
             allEmails = allEmails.concat(response.records)
-            if (response.nextDeltaToken) {
-                storedDeltaToken = response.nextDeltaToken
+            if (response.updateDeltaToken) {
+                storedUpdateDeltaToken = response.updateDeltaToken
             }
         }
 
@@ -113,13 +129,57 @@ export class Account {
         await db.account.update({
             where: {id: account.id},
             data: {
-                nextDeltaToken: storedDeltaToken
+                updateDeltaToken: storedUpdateDeltaToken
             }
         })
 
         return {
             emails: allEmails,
-            deltaToken: storedDeltaToken
+            updateDeltaToken: storedUpdateDeltaToken
+        }
+    }
+
+    async syncDeletedEmails() {
+        const account = await db.account.findUnique({
+            where: {accessToken: this.token}
+        })
+        if (!account) throw new Error("Account not found")
+        if (!account.deleteDeltaToken) throw new Error("Account not ready for sync")
+
+        let response = await this.getDeletedEmails({
+            deltaToken: account.deleteDeltaToken
+        })
+        let storedDeleteDeltaToken = account.deleteDeltaToken
+        let allEmails: EmailMessage[] = response.records
+
+        if (response.deleteDeltaToken) {
+            storedDeleteDeltaToken = response.deleteDeltaToken
+        }
+
+        while (response.nextPageToken) {
+            response = await this.getDeletedEmails({pageToken: response.nextPageToken})
+            allEmails = allEmails.concat(response.records)
+            if (response.deleteDeltaToken) {
+                storedDeleteDeltaToken = response.deleteDeltaToken
+            }
+        }
+
+        try {
+            syncEmailsToDatabase(allEmails, account.id)
+        } catch (error) {
+            console.error("Error during sync:", error)
+        }
+
+        await db.account.update({
+            where: {id: account.id},
+            data: {
+                updateDeltaToken: storedDeleteDeltaToken
+            }
+        })
+
+        return {
+            emails: allEmails,
+            updateDeltaToken: storedDeleteDeltaToken
         }
     }
 

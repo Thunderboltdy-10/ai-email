@@ -85,46 +85,48 @@ const EmailEditor = ({subject, setSubject, toValues, setToValues, ccValues, setC
     if (!editor) return null
 
     return (
-        <div>
+        <div className="flex flex-col h-full">
             <div className='flex p-4 py-2 border-b'>
                 <EditorMenuBar editor={editor}/>
             </div>
-            <div className='p-4 pb-0 space-y-2'>
-                {expanded && (
-                    <>
-                        <TagInput
-                        label='To'
-                        onChange={setToValues}
-                        placeholder='Add Recipients'
-                        value={toValues}
-                        />
-                        <TagInput
-                        label='Cc'
-                        onChange={setCcValues}
-                        placeholder='Add Recipients'
-                        value={ccValues}
-                        />
-                        <Input id='subject' placeholder='Subject' value={subject}
-                        onChange={(e) => setSubject(e.target.value)}/>
-                    </>
-                )}
-                <div className='flex items-center gap-2'>
-                    <div className='cursor-pointer' onClick={() => setExpanded(!expanded)}>
-                        <span className="text-green-600 font-medium">
-                            Draft {" "}
-                        </span>
-                        <span>
-                            to {to.join(", ")}
-                        </span>
+            <div className="overflow-auto flex-1">
+                <div className='p-4 pb-0 space-y-2'>
+                    {expanded && (
+                        <>
+                            <TagInput
+                            label='To'
+                            onChange={setToValues}
+                            placeholder='Add Recipients'
+                            value={toValues}
+                            />
+                            <TagInput
+                            label='Cc'
+                            onChange={setCcValues}
+                            placeholder='Add Recipients'
+                            value={ccValues}
+                            />
+                            <Input id='subject' placeholder='Subject' value={subject}
+                            onChange={(e) => setSubject(e.target.value)}/>
+                        </>
+                    )}
+                    <div className='flex items-center gap-2'>
+                        <div className='cursor-pointer' onClick={() => setExpanded(!expanded)}>
+                            <span className="text-green-600 font-medium">
+                                Draft {" "}
+                            </span>
+                            <span>
+                                to {to.join(", ")}
+                            </span>
+                        </div>
+                        <AIComposeButton isComposing={defaultToolbarExpanded ?? false} onGenerate={onGenerate}/>
                     </div>
-                    <AIComposeButton isComposing={defaultToolbarExpanded ?? false} onGenerate={onGenerate}/>
+                </div>
+                <div className="w-full px-4 mb-4 overflow-y-auto">
+                    <EditorContent editor={editor} value={value}/>
                 </div>
             </div>
-            <div className="w-full px-4 mb-4 h-[195px] overflow-y-auto">
-                <EditorContent editor={editor} value={value}/>
-            </div>
             <Separator />
-            <div className='py-3 px-4 flex items-center justify-between'>
+            <div className='pt-3 pb-9 px-4 flex items-center justify-between shrink-0 sticky'>
                 <span className='text-sm'>
                     Tip: Press {" "}
                     <kbd className='px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg'>
@@ -135,7 +137,7 @@ const EmailEditor = ({subject, setSubject, toValues, setToValues, ccValues, setC
                 <Button onClick={async () => {
                     editor?.commands?.clearContent()
                     await handleSend(value)
-                }} disabled={isSending}>
+                }} disabled={isSending} className='cursor-pointer'>
                     Send
                 </Button>
             </div>

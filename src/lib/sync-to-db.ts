@@ -15,6 +15,11 @@ export async function syncEmailsToDatabase(emails: EmailMessage[], accountId: st
     try {
         //Promise.all(emails.map((email, index) => upsertEmail(email, accountId, index)))
         for (const email of emails) {
+            if (email.sysLabels.includes("trash")) {
+                console.log("Email is in trash, skipping")
+                continue
+            }
+
             const body = turndown.turndown(email.body ?? email.bodySnippet ?? "")
             const embeddings = await getEmbeddings(body)
 
@@ -29,7 +34,7 @@ export async function syncEmailsToDatabase(emails: EmailMessage[], accountId: st
                 embeddings
             })
             
-            await upsertEmail(email, accountId, 0)
+            await upsertEmail(email, accountId, emails.indexOf(email) + 1)
         }
     } catch (error) {
         console.log("Oopsies", error)
@@ -41,7 +46,7 @@ async function upsertEmail(email: EmailMessage, accountId: string, index: number
 
     try {
         let emailLabelType: 'inbox' | 'sent' | 'draft' = 'inbox'
-
+        
         if (email.sysLabels.includes('inbox') || email.sysLabels.includes('important')) {
             emailLabelType = 'inbox'
         } else if (email.sysLabels.includes('sent')) {
@@ -203,7 +208,7 @@ async function upsertEmail(email: EmailMessage, accountId: string, index: number
         }
 
     } catch (error) {
-        
+        console.log(`Failed to upsert email ${email.id}: ${error}`)
     }
 }
 

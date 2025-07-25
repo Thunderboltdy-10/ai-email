@@ -4,6 +4,7 @@ import RenderResults from "./render-results"
 import { useLocalStorage } from "usehooks-ts"
 import useThemeSwitching from "./use-theme-switching"
 import useAccountSwitching from "./use-account-switching"
+import useToggleDone from "./use-toggle-done"
 
 export default function KBar({children}: {children: React.ReactNode}) {
     const [tab, setTab] = useLocalStorage("email-tab", "inbox")
@@ -57,13 +58,13 @@ export default function KBar({children}: {children: React.ReactNode}) {
         {
             id: "doneAction",
             name: "See Pending",
-            shortcut: ["e", "u"],
+            shortcut: ["e", "i"],
             keywords: "pending, undone, not done",
             section: "Navigation",
             subtitle: "View your pending emails",
             perform: () => {
                 setDone(false)
-            }
+            },
         },
     ]
 
@@ -77,6 +78,7 @@ export default function KBar({children}: {children: React.ReactNode}) {
 const ActualComponent = ({children}: {children: React.ReactNode}) => {
     useThemeSwitching()
     useAccountSwitching()
+    useToggleDone()
 
     return <>
         <KBarPortal>

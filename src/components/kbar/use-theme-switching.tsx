@@ -1,11 +1,17 @@
 import { useTheme } from 'next-themes'
 import React from 'react'
 import {useRegisterActions} from "kbar"
+import { useAtom } from 'jotai'
+import { themeToggle } from '../theme-toggle'
 
 const useThemeSwitching = () => {
     const {theme, setTheme} = useTheme()
+    const [isToggling, setIsToggling] = useAtom(themeToggle)
+
     const toggleTheme = () => {
-        setTheme(theme === "dark" ? "light" : "dark")
+        setIsToggling(true)
+        setTheme(theme === "light" ? "dark" : "light")
+        setTimeout(() => setIsToggling(false), 1000)
     }
 
     const themeActions = [
@@ -39,10 +45,6 @@ const useThemeSwitching = () => {
     ]
 
     useRegisterActions(themeActions, [theme])
-
-    return (
-        <div>useThemeSwitching</div>
-    )
 }
 
 export default useThemeSwitching

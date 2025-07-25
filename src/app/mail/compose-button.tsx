@@ -17,11 +17,12 @@ import { api } from '@/trpc/react'
 import useThreads from '@/hooks/use-threads'
 import { toast } from 'sonner'
 
-const ComposeButton = () => {
+const ComposeButton = ({collapsed}: {collapsed?: boolean}) => {
     const [toValues, setToValues] = React.useState<{label: React.JSX.Element, value: string}[]>([])
     const [ccValues, setCcValues] = React.useState<{label: React.JSX.Element, value: string}[]>([])
 
     const [subject, setSubject] = React.useState<string>("")
+    const [open, setOpen] = React.useState(false)
 
     const sendEmail = api.account.sendEmail.useMutation()
     const {account} = useThreads()
@@ -42,6 +43,7 @@ const ComposeButton = () => {
         }, {
             onSuccess: () => {
                 toast.success("Email sent!")
+                setOpen(false)
             },
             onError: (error) => {
                 console.error(error)
@@ -51,11 +53,11 @@ const ComposeButton = () => {
     }
 
     return (
-        <Drawer>
+        <Drawer open={open} onOpenChange={setOpen}>
             <DrawerTrigger asChild>
-                <Button>
-                    <Pencil className='size-4 mr-1'/>
-                    Compose
+                <Button className='cursor-pointer'>
+                    <Pencil className='size-4'/>
+                    {!collapsed && <>Compose</>}
                 </Button>
             </DrawerTrigger>
             <DrawerContent>

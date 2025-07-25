@@ -2,10 +2,13 @@ import z from "zod";
 import { createTRPCRouter, privateProcedure } from "../trpc";
 import { db } from "@/server/db";
 import type { Prisma } from "@prisma/client";
-import { emailAddressSchema } from "@/types";
+import { emailAddressSchema, emailMessageSchema } from "@/types";
 import { Account } from "@/lib/account";
 import { OramaClient } from "@/lib/orama";
 import { FREE_CREDITS_PER_DAY } from "@/constants";
+import { deleteEmail } from "@/lib/aurinko";
+import { TrendingUp } from "lucide-react";
+import { add } from "lodash";
 
 export const authoriseAccountAccess = async (accountId: string, userId: string) => {
     const account = await db.account.findFirst({
@@ -62,7 +65,8 @@ export const accountRouter = createTRPCRouter({
     getThreads: privateProcedure.input(z.object({
         accountId: z.string(),
         tab: z.string(),
-        done: z.boolean()
+        done: z.boolean(),
+        offset: z.number()
     })).query(async ({ctx, input}) => {
         const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
         const acc = new Account(account.accessToken)
@@ -96,11 +100,14 @@ export const accountRouter = createTRPCRouter({
                         subject: true,
                         sysLabels: true,
                         id: true,
-                        sentAt: true
+                        sentAt: true,
+                        to: true,
+                        cc: true,
+                        bcc: true
                     }
                 },
             },
-            take: 15,
+            take: input.offset,
             orderBy: {
                 lastMessageDate: "desc"
             }
@@ -171,6 +178,7 @@ export const accountRouter = createTRPCRouter({
         threadId: z.string().optional()
     })).mutation(async ({ctx, input}) => {
         const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+
         const acc = new Account(account.accessToken)
         await acc.sendEmail({
             body: input.body,
@@ -196,6 +204,38 @@ export const accountRouter = createTRPCRouter({
         const results = await orama.search({term: input.query})
         return results
     }),
+    changeRead: privateProcedure.input(z.object({
+        accountId: z.string(),
+        messageId: z.string(),
+        removeLabel: z.string().optional(),
+        addLabel: z.string().optional()
+    })).mutation(async ({ctx, input}) => {
+        const email = await ctx.db.email.findUnique({
+            where: {
+                id: input.messageId
+            },
+            select: {
+                sysLabels: true
+            }
+        })
+        if (!email) throw new Error("Email not found")
+        
+        let updatedLabels = email.sysLabels
+        if (input.removeLabel) {
+            updatedLabels = email.sysLabels.filter(label => label !== input.removeLabel)
+        }
+        
+        if (input.addLabel) updatedLabels.push(input.addLabel)
+
+        await ctx.db.email.update({
+            where: {
+                id: input.messageId
+            },
+            data: {
+                sysLabels: updatedLabels
+            }
+        })
+    }),
     getChatbotInteraction: privateProcedure.input(z.object({
         accountId: z.string()
     })).query(async ({ctx, input}) => {
@@ -211,5 +251,76 @@ export const accountRouter = createTRPCRouter({
 
         const remainingCredits = FREE_CREDITS_PER_DAY - (chatbotInteraction?.count || 0)
         return {remainingCredits}
+    }),
+    getDone: privateProcedure.input(z.object({
+        accountId: z.string(),
+        threadId: z.string()
+    })).query(async ({ctx, input}) => {
+        const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+        
+        const thread = await ctx.db.thread.findUnique({
+            where: {
+                id: input.threadId,
+            },
+            select: {
+                done: true
+            }
+        })
+
+        if (!thread) throw new Error("Thread not found")
+
+        return thread.done
+    }),
+    toggleDone: privateProcedure.input(z.object({
+        threadId: z.string(),
+        done: z.boolean()
+    })).mutation(async ({ctx, input}) => {
+        await ctx.db.thread.update({
+            where: {
+                id: input.threadId
+            },
+            data: {
+                done: input.done
+            }
+        })
+    }),
+    deleteMail: privateProcedure.input(z.object({
+        accountId: z.string(),
+        threadId: z.string(),
+        messageId: z.string(),
+        sentAt: z.string(),
+        body: z.string()
+    })).mutation(async ({ctx, input}) => {
+        const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+        
+        await deleteEmail(account.accessToken, input.messageId)
+
+        const orama = new OramaClient(account.id)
+        await orama.initialize()
+        
+        await orama.deleteMail({
+            threadId: input.threadId,
+            sentAt: input.sentAt,
+            body: input.body
+        })
+
+        await ctx.db.email.delete({
+            where: {
+                id: input.messageId
+            }
+        })
+    }),
+    deleteThread: privateProcedure.input(z.object({
+        accountId: z.string(),
+        threadId: z.string()
+    })).mutation(async ({ctx, input}) => {
+        const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+        
+        await ctx.db.thread.delete({
+            where: {
+                id: input.threadId
+            }
+        })
+
     })
 })

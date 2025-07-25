@@ -20,33 +20,22 @@ const PremiumBanner = () => {
         })()
     }, [])
 
-    if (!isSubscribed) return <div className='bg-gray-900 relative p-4 rounded-lg border overflow-hidden flex flex-col md:flex-row gap-4'>
-        <img src="/bot.webp" aria-label="bot-img" className='md:absolute md:-bottom-6 md:-right-10 h-[180px] w-auto' />
+    return <div className='bg-gray-900 relative p-4 rounded-lg border overflow-hidden flex flex-col md:flex-row gap-4'>
+        <img src="/bot.webp" aria-label="bot-img" className='md:absolute md:-right-12 h-[180px] w-auto' />
         <div>
             <div className="flex items-center gap-2">
-                <h1 className='text-white text-xl font-bold'>Basic Plan</h1>
-                <p className='text-gray-400 text-sm md:max-w-full'>
-                    {data?.remainingCredits} / {FREE_CREDITS_PER_DAY} AI messages remaining
-                </p>
+                <h1 className='text-white text-xl font-bold w-full'>
+                    {isSubscribed ? "Pro Plan" : "Basic Plan"}
+                </h1>
+                {!isSubscribed && (
+                    <p className='text-gray-400 text-sm w-full'>
+                        {data?.remainingCredits} / {FREE_CREDITS_PER_DAY} remaining
+                    </p>
+                )}
                 <div className="h-4"></div>
             </div>
-            <p className='text-gray-400 text-sm md:max-w-[calc(100%-150px)]'>
-                Upgrate to pro to ask unlimited questions
-            </p>
-            <div className="h-4"></div>
-            <StripeButton />
-        </div>
-    </div>
-
-    if (isSubscribed) return <div className='bg-gray-900 relative p-4 rounded-lg border overflow-hidden flex flex-col md:flex-row gap-4'>
-        <img src="/bot.webp" aria-label="bot-img" className='md:absolute md:-bottom-6 md:-right-10 h-[180px] w-auto' />
-        <div>
-            <div className="flex items-center gap-2">
-                <h1 className='text-white text-xl font-bold'>Premium Plan</h1>
-                <div className="h-4"></div>
-            </div>
-            <p className='text-gray-400 text-sm md:max-w-[calc(100%-70px)]'>
-                Ask as many questions as you want!
+            <p className='text-gray-400 text-sm md:max-w-[calc(100%-80px)]'>
+                {isSubscribed ? "Ask as many questions as you want!" : "Upgrate to pro to ask unlimited questions"}
             </p>
             <div className="h-4"></div>
             <StripeButton />

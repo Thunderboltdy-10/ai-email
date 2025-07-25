@@ -26,8 +26,19 @@ const SearchBar = () => {
             placeholder='Search...'
             className='pl-8'
             value={searchValue}
-            onChange={e => setSearchValue(e.target.value)}
-            onFocus={() => setIsSearching(true)}
+            onChange={e => {
+                setSearchValue(e.target.value)
+                if (e.target.value === "") {
+                    setIsSearching(false)
+                } else {
+                    setIsSearching(true)
+                }
+            }}
+            onFocus={() => {
+                if (searchValue !== "") {
+                    setIsSearching(true)
+                }
+            }}
             onBlur={() => handleBlur()}
             />
             <div className='absolute right-2 top-2.5 flex items-center gap-2'>

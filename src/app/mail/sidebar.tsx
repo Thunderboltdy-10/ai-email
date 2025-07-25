@@ -4,27 +4,35 @@ import { useLocalStorage } from 'usehooks-ts'
 import { Nav } from './nav'
 import { File, Inbox, Send } from 'lucide-react'
 import { api } from '@/trpc/react'
+import useThreads from '@/hooks/use-threads'
 
 type Props = {
     isCollapsed: boolean
 }
 
 const Sidebar = ({isCollapsed}: Props) => {
+    const {threads} = useThreads()
     const [accountId] = useLocalStorage("accountId", "")
     const [tab] = useLocalStorage<"inbox" | "draft" | "sent">("email-tab", "inbox")
 
-    const {data: inboxThreads} = api.account.getNumThreads.useQuery({
+    const {data: inboxThreads, refetch: refetchInbox} = api.account.getNumThreads.useQuery({
         accountId,
         tab: "inbox"
     })
-    const {data: draftThreads} = api.account.getNumThreads.useQuery({
+    const {data: draftThreads, refetch: refetchDraft} = api.account.getNumThreads.useQuery({
         accountId,
         tab: "draft"
     })
-    const {data: sentThreads} = api.account.getNumThreads.useQuery({
+    const {data: sentThreads, refetch: refetchSent} = api.account.getNumThreads.useQuery({
         accountId,
         tab: "sent"
     })
+
+    React.useEffect(() => {
+        if (tab === "inbox") refetchInbox()
+        if (tab === "draft") refetchDraft() 
+        if (tab === "sent") refetchSent()
+    }, [threads])
 
     return (
         <Nav

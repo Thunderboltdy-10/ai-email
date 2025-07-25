@@ -18,22 +18,34 @@ export async function POST(req: Request) {
         const today = new Date().toDateString()
 
         const isSubscribed = await getSubscriptionStatus()
-        if (!isSubscribed) {
-            const chatbotInteraction = await db.chatBotInteraction.findUnique({
-                where: {
+        
+        const chatbotInteraction = await db.chatBotInteraction.findUnique({
+            where: {
+                userId
+            }
+        })
+
+        if (!chatbotInteraction) {
+            await db.chatBotInteraction.create({
+                data: {
                     day: today,
-                    userId
+                    userId,
+                    count: 0
                 }
             })
-            if (!chatbotInteraction) {
-                await db.chatBotInteraction.create({
-                    data: {
-                        day: today,
-                        userId,
-                        count: 1
-                    }
-                })
-            } else if (chatbotInteraction.count >= FREE_CREDITS_PER_DAY) {
+        } else if (chatbotInteraction.day !== today) {
+            await db.chatBotInteraction.update({
+                where: {
+                    userId
+                },
+                data: {
+                    day: today,
+                    userId,
+                    count: 0
+                }
+            }) 
+        } else if (!isSubscribed) {
+            if (chatbotInteraction.count >= FREE_CREDITS_PER_DAY) {
                 return new Response("You have reached the maximum number of messages for today", {status: 429})
             }
         }

@@ -1,6 +1,5 @@
 "use client"
 
-// import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -42,7 +41,7 @@ export function Nav({ links, isCollapsed }: NavProps) {
                         buttonVariants({ variant: link.variant, size: "icon" }),
                         "h-9 w-9 cursor-pointer",
                         link.variant === "default" &&
-                        "dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-white"
+                        "dark:bg-muted dark:text-white dark:hover:bg-muted dark:hover:text-white"
                     )}
                     >
                     <link.icon className="w-4 h-4" />

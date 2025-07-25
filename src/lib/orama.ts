@@ -1,6 +1,6 @@
 import { db } from "@/server/db";
 import type { AnyOrama } from "@orama/orama";
-import {create, insert, search, save, load} from "@orama/orama"
+import {create, insert, search, remove} from "@orama/orama"
 import {persist, restore} from "@orama/plugin-data-persistence"
 import { getEmbeddings } from "./embedding";
 
@@ -78,5 +78,30 @@ export class OramaClient {
     async insert(document: any) {
         await insert(this.orama, document)
         await this.saveIndex()
+    }
+
+    async deleteMail({body, sentAt, threadId}: {body: string, sentAt: string, threadId: string}) {
+        const mail = await search(this.orama, {
+            where: {
+                body,
+                sentAt,
+                threadId
+            }
+        })
+
+        if (!mail || mail.hits.length === 0 ) {
+            console.log("No emails found to delete in orama db")
+            return
+        }
+
+        console.log(mail.hits)
+        
+        for (const hit of mail.hits) {
+            await remove(this.orama, hit.id)
+        }
+
+        await this.saveIndex()
+
+        console.log("Deleted", mail.hits.length, "emails")
     }
 }

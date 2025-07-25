@@ -58,9 +58,9 @@ const ResultItem = React.forwardRef(
                 </div>
                 {action.shortcut?.length ? (
                     <div className="grid grid-flow-col gap-1 relative z-10">
-                        {action.shortcut.map((sc) => (
+                        {action.shortcut.map((sc, index) => (
                             <kbd
-                                key={sc}
+                                key={index}
                                 className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-1 border border-gray-200 dark:border-gray-700 shadow font-medium rounded-md text-xs flex items-center gap-1"
                             >
                                 {sc}
