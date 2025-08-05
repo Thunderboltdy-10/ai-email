@@ -6,7 +6,6 @@ import { emailAddressSchema, emailMessageSchema } from "@/types";
 import { Account } from "@/lib/account";
 import { OramaClient } from "@/lib/orama";
 import { FREE_CREDITS_PER_DAY } from "@/constants";
-import { deleteEmail } from "@/lib/aurinko";
 import { TrendingUp } from "lucide-react";
 import { add } from "lodash";
 
@@ -58,9 +57,23 @@ export const accountRouter = createTRPCRouter({
         return await ctx.db.thread.count({
             where: {
                 accountId: account.id,
-                ...filter
+                ...filter,
+                emails: {
+                    some: {
+                        sysLabels: {
+                            has: "unread"
+                        }
+                    }
+                }
             }
         })
+
+        // return await ctx.db.thread.count({
+        //     where: {
+        //         accountId: account.id,
+        //         ...filter,
+        //     }
+        // })
     }),
     getThreads: privateProcedure.input(z.object({
         accountId: z.string(),
@@ -103,7 +116,9 @@ export const accountRouter = createTRPCRouter({
                         sentAt: true,
                         to: true,
                         cc: true,
-                        bcc: true
+                        bcc: true,
+                        hasAttachments: true,
+                        attachments: true
                     }
                 },
             },
@@ -129,9 +144,11 @@ export const accountRouter = createTRPCRouter({
     }),
     getReplyDetails: privateProcedure.input(z.object({
         accountId: z.string(),
-        threadId: z.string()
+        threadId: z.string(),
+        messageId: z.string().optional()
     })).query(async ({ctx, input}) => {
         const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+
         const thread = await ctx.db.thread.findFirst({
             where: {
                 id: input.threadId
@@ -140,28 +157,47 @@ export const accountRouter = createTRPCRouter({
                 emails: {
                     orderBy: {sentAt: "asc"},
                     select: {
+                        id: true,
                         from: true,
                         to: true,
                         cc: true,
                         bcc: true,
                         sentAt: true,
                         subject: true,
-                        internetMessageId: true
+                        internetMessageId: true,
+                        body: true
                     }
                 }
             }
         })
         if (!thread || thread.emails.length === 0) throw new Error("Thread not found")
-        
-        const lastExternalEmail = thread.emails.reverse()[0]
-        if (!lastExternalEmail) throw new Error("No external email found")
 
-        return {
-            subject: lastExternalEmail.subject,
-            to: [lastExternalEmail.from, ...lastExternalEmail.to.filter(to => to.address !== account.emailAddress)],
-            cc: lastExternalEmail.cc.filter(cc => cc.address !== account.emailAddress),
-            from: {name: account.name, address: account.emailAddress},
-            id: lastExternalEmail.internetMessageId
+        if (!input.messageId) {
+            const lastExternalEmail = thread.emails.reverse()[0]
+            if (!lastExternalEmail) throw new Error("No external email found")
+
+            return {
+                subject: lastExternalEmail.subject,
+                to: [lastExternalEmail.from, ...lastExternalEmail.to.filter(to => to.address !== account.emailAddress)],
+                cc: lastExternalEmail.cc.filter(cc => cc.address !== account.emailAddress),
+                from: {name: lastExternalEmail.from.name, address: lastExternalEmail.from.address},
+                id: lastExternalEmail.internetMessageId,
+                sentAt: lastExternalEmail.sentAt,
+                body: lastExternalEmail.body
+            }
+        } else {
+            const email = thread.emails.find(email => email.id === input.messageId)
+            if (!email) throw new Error("No email found")
+
+            return {
+                subject: email.subject,
+                to: [email.from, ...email.to.filter(to => to.address !== account.emailAddress)],
+                cc: email.cc.filter(cc => cc.address !== account.emailAddress),
+                from: {name: email.from.name, address: email.from.address},
+                id: email.internetMessageId,
+                sentAt: email.sentAt,
+                body: email.body
+            }
         }
     }),
     sendEmail: privateProcedure.input(z.object({
@@ -175,22 +211,38 @@ export const accountRouter = createTRPCRouter({
 
         replyTo: emailAddressSchema,
         inReplyTo: z.string().optional(),
-        threadId: z.string().optional()
+        threadId: z.string().optional(),
+        messageId: z.string().optional()
     })).mutation(async ({ctx, input}) => {
         const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
 
         const acc = new Account(account.accessToken)
-        await acc.sendEmail({
-            body: input.body,
-            subject: input.subject,
-            from: input.from,
-            to: input.to,
-            cc: input.cc,
-            bcc: input.bcc,
-            replyTo: input.replyTo,
-            inReplyTo: input.inReplyTo,
-            threadId: input.threadId,
-        })
+
+        if (input.messageId !== undefined || !input.messageId) {
+            await acc.sendEmail({
+                body: input.body,
+                subject: input.subject,
+                from: input.from,
+                to: input.to,
+                cc: input.cc,
+                bcc: input.bcc,
+                replyTo: input.replyTo,
+                inReplyTo: input.inReplyTo,
+                threadId: input.threadId,
+            })
+        } else {
+            await acc.replyEmail({
+                body: input.body,
+                subject: input.subject,
+                from: input.from,
+                to: input.to,
+                cc: input.cc,
+                bcc: input.bcc,
+                replyTo: input.replyTo,
+                inReplyTo: input.inReplyTo,
+                messageId: input.messageId,
+            })
+        }
     }),
     searchEmails: privateProcedure.input(z.object({
         accountId: z.string(),
@@ -292,8 +344,9 @@ export const accountRouter = createTRPCRouter({
         body: z.string()
     })).mutation(async ({ctx, input}) => {
         const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+        const acc = new Account(account.accessToken)
         
-        await deleteEmail(account.accessToken, input.messageId)
+        await acc.deleteEmail(account.accessToken, input.messageId).catch(console.error)
 
         const orama = new OramaClient(account.id)
         await orama.initialize()
@@ -309,6 +362,12 @@ export const accountRouter = createTRPCRouter({
                 id: input.messageId
             }
         })
+
+        return ctx.db.email.count({
+            where: {
+                threadId: input.threadId
+            }
+        })
     }),
     deleteThread: privateProcedure.input(z.object({
         accountId: z.string(),
@@ -322,5 +381,37 @@ export const accountRouter = createTRPCRouter({
             }
         })
 
+    }),
+    setAttachmentContent: privateProcedure.input(z.object({
+        accountId: z.string(),
+        messageId: z.string(),
+        attachmentId: z.string(),
+    })).mutation(async ({ctx, input}) => {
+        const account = await authoriseAccountAccess(input.accountId, ctx.auth.userId)
+        const acc = new Account(account.accessToken)
+
+        const attachment = await acc.setAttachment(input.messageId, input.attachmentId).catch(console.error)
+
+        await ctx.db.emailAttachment.update({
+            where: {
+                id: input.attachmentId
+            },
+            data: {
+                content: attachment.content
+            }
+        })
+    }),
+    getAttachmentsByCids: privateProcedure.input(z.object({
+        accountId: z.string(),
+        messageId: z.string(),
+        contentIds: z.array(z.string())
+    })).query(async ({ input }) => {
+        console.log(input)
+        return db.emailAttachment.findMany({
+            where: {
+                emailId: input.messageId,
+                contentId: { in: input.contentIds }
+            }
+        });
     })
 })

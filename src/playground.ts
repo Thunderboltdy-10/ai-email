@@ -5,6 +5,9 @@ import { getEmbeddings } from "./lib/embedding"
 import { pushNotification } from "./lib/aurinko"
 import { authoriseAccountAccess } from "./server/api/routers/account"
 import { Account } from "./lib/account"
+import axios from "axios"
+import { db } from "./server/db"
+import { api } from "./trpc/react"
 
 
 // const orama = new OramaClient("132090")
@@ -64,49 +67,96 @@ import { Account } from "./lib/account"
 
 // console.log(accessToken?.accessToken)
 
-import { db } from "@/server/db"
-import axios from "axios"
+// import { db } from "@/server/db"
+// import axios from "axios"
 
-async function getDeleteDeltaToken(accessToken: string) {
-  try {
-    const response = await axios.post("https://api.aurinko.io/v1/email/sync", {}, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      },
-      params: {
-        daysWithin: 1,
-        bodyType: "html"
-      }
-    })
+// async function getDeleteDeltaToken(accessToken: string) {
+//   try {
+//     const response = await axios.post("https://api.aurinko.io/v1/email/sync", {}, {
+//       headers: {
+//         Authorization: `Bearer ${accessToken}`
+//       },
+//       params: {
+//         daysWithin: 1,
+//         bodyType: "html"
+//       }
+//     })
 
-    const sync = response.data
+//     const sync = response.data
 
-    if (!sync.ready) {
-      console.log("Sync is not ready yet. Please retry later.")
-      return
-    }
+//     if (!sync.ready) {
+//       console.log("Sync is not ready yet. Please retry later.")
+//       return
+//     }
 
-    const deleteDeltaToken = sync.syncDeletedToken
+//     const deleteDeltaToken = sync.syncDeletedToken
 
-    if (!deleteDeltaToken) {
-      console.log("No deleteDeltaToken returned")
-      return
-    }
+//     if (!deleteDeltaToken) {
+//       console.log("No deleteDeltaToken returned")
+//       return
+//     }
 
-    const updated = await db.account.update({
-      where: { accessToken },
-      data: { deleteDeltaToken }
-    })
+//     const updated = await db.account.update({
+//       where: { accessToken },
+//       data: { deleteDeltaToken }
+//     })
 
-    console.log("Updated account:", updated.id, "with deleteDeltaToken:", deleteDeltaToken)
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error("Error:", error.response?.data || error.message)
-    } else {
-      console.error("Unexpected error:", error)
-    }
-  }
-}
+//     console.log("Updated account:", updated.id, "with deleteDeltaToken:", deleteDeltaToken)
+//   } catch (error) {
+//     if (axios.isAxiosError(error)) {
+//       console.error("Error:", error.response?.data || error.message)
+//     } else {
+//       console.error("Unexpected error:", error)
+//     }
+//   }
+// }
 
-// Replace this with a real accessToken from your DB
-getDeleteDeltaToken("A9zk2qhzntlhZZN-i5OGV3yWJMhFZkHZS8O5hHdpsBQ")
+// // Replace this with a real accessToken from your DB
+// getDeleteDeltaToken("A9zk2qhzntlhZZN-i5OGV3yWJMhFZkHZS8O5hHdpsBQ")
+
+// const CLIENT_ID   = process.env.AURINKO_CLIENT_ID!;
+// const BASE_URL    = process.env.NEXT_PUBLIC_URL!;
+// const ACCOUNT_ID  = "132090";  // ← replace with the accountId you want to re-auth
+
+// if (!CLIENT_ID || !BASE_URL) {
+//   console.error("⚠️  Please set AURINKO_CLIENT_ID and NEXT_PUBLIC_URL");
+//   process.exit(1);
+// }
+
+// // 2️⃣  Build the query params for /authorizeUser
+// const params = new URLSearchParams({
+//   clientId:     CLIENT_ID,
+//   serviceType:  "Google",
+//   scopes: 'Mail.All',
+//   responseType: "code",            // you want a `code` returned for exchange
+//   accountRole:  "primary",         // re-auth this primary account
+//   accountId:    ACCOUNT_ID,        // the existing account you already have in your DB
+//   returnUrl:    `${BASE_URL}/api/aurinko/callback`,
+//   ensureScopes:"true",
+//   ensureAccess:"true"
+// });
+
+// // 3️⃣  Compose the full Authorize URL
+// const authUrl = `https://api.aurinko.io/v1/auth/authorize?${params.toString()}`;
+
+// console.log("\n🚀  Open this URL to re-authorize:");
+// console.log(authUrl, "\n");
+
+// async function main() {
+//   const orphanThreads = await db.thread.findMany({
+//     where: {
+//       emails: { none: {} },
+//     },
+//   });
+
+//   console.log('Orphan threads:', orphanThreads);
+
+//   for (const thread of orphanThreads) {
+//     await db.thread.delete({
+//       where: { id: thread.id },
+//     });
+//     console.log(`Deleted thread ${thread.id}`);
+//   }
+// }
+
+// main().catch(console.error);

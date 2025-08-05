@@ -1,7 +1,7 @@
 "use client"
 import useThreads from '@/hooks/use-threads'
 import { cn } from '@/lib/utils'
-import type { RouterOutputs } from '@/trpc/react'
+import { api, type RouterOutputs } from '@/trpc/react'
 import React from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -17,7 +17,15 @@ import {Letter} from "react-letter"
 import AvatarIcon from '@/components/avatar-icon'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { MoreVertical } from 'lucide-react'
+import { Forward, MoreVertical, Reply, ReplyAll, Trash2, TrendingUp } from 'lucide-react'
+import { useAtom } from 'jotai'
+import { currentMessage, replyType } from './thread-display'
+import DeleteButton from './delete-button'
+import { turndown } from '@/lib/turndown'
+import { toast } from 'sonner'
+import ReactDOM from "react-dom"
+import Attachment from './attachment'
+import { attempt } from 'lodash'
 
 type Props = {
     email: RouterOutputs["account"]["getThreads"][0]["emails"][0]
@@ -132,19 +140,122 @@ export function emailFormat(html: string, dark?: boolean): string {
         }
     }
 
-    // Preserve <style> tags instead of removing them
-    return doc.documentElement.outerHTML;
+    return doc.body?.innerHTML ?? "";
 }
 
-
-
 const EmailDisplay = ({email}: Props) => {
-    const {account} = useThreads()
+    const {account, accountId, threadId, setThreadId, refetch} = useThreads()
     const {theme} = useTheme()
     
     const [showDetails, setShowDetails] = React.useState(false)
+    const [isDeleting, setIsDeleting] = React.useState(false)
+    const [formattedHtml, setFormattedHtml] = React.useState<string>("");
+
+    const [replyOptions, setReplyOptions] = useAtom(replyType)
+    const [messageId, setMessageId] = useAtom(currentMessage)
 
     const isMe = account?.emailAddress === email.from.address
+    
+    const deleteMail = api.account.deleteMail.useMutation()
+    const deleteThread = api.account.deleteThread.useMutation()
+
+    const changeReply = (option: string, id: string) => {
+        setReplyOptions(option)
+        setMessageId(id)
+    }
+
+    const trashEmail = () => {
+        setIsDeleting(true)
+
+        try {
+            const body = turndown.turndown(email.body ?? email.bodySnippet ?? "")
+            
+            const remaining = deleteMail.mutateAsync({
+                accountId,
+                threadId: threadId ?? "",
+                messageId: email.id,
+                sentAt: email.sentAt.toISOString(),
+                body
+            })
+            remaining.then((result) => {
+                if (result === 0) {
+                    deleteThread.mutate({
+                        accountId,
+                        threadId: threadId ?? ""
+                    }, {
+                        onSuccess: () => {
+                            toast.success("Thread moved to trash")
+                            setThreadId(null)
+                        }
+                    })
+                } else {
+                    toast.success("Email moved to trash")
+                }
+                setIsDeleting(false)
+                refetch()
+            })
+
+        } catch (error) {
+            toast.error("Error deleting email")
+        }
+
+    }
+
+    const rawHtml = React.useMemo(
+        () => emailFormat(email.body ?? "", theme === "dark"),
+        [email.body, theme]
+    );
+
+    const cids = React.useMemo(() => {
+        const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+        return Array.from(
+            new Set(
+                Array.from(doc.querySelectorAll<HTMLImageElement>('img[src^="cid:"]'))
+                    .map(img => img.getAttribute("src")!.slice(4).replace(/^<|>$/g, ""))
+                    .filter(Boolean)
+            )
+        );
+    }, [rawHtml]);
+
+    const { data: attachments , refetch: refetchAttachments, isLoading: attachmentLoading} = api.account.getAttachmentsByCids.useQuery(
+        { accountId, messageId: email.id, contentIds: cids },
+        { enabled: cids.length > 0 }
+    );
+
+    const loadMutation = api.account.setAttachmentContent.useMutation({
+        onSuccess: () => {
+            refetchAttachments()
+        }
+    })
+
+    React.useEffect(() => {
+        if (!attachments) {
+            setFormattedHtml(rawHtml);
+            return;
+        }
+
+        attachments.forEach(att => {
+            if (att.content === null && !attachmentLoading) {
+                loadMutation.mutate({
+                    accountId,
+                    messageId: email.id,
+                    attachmentId: att.id
+                })
+            }
+        })
+
+        const allLoaded = attachments.every(att => att.content !== null)
+
+        if (allLoaded) {
+            const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+
+            attachments.forEach(att => {
+                const img = doc.querySelector(`img[src="cid:${att.contentId}"]`);
+                if (img) img.setAttribute("src", `data:${att.mimeType};base64,${att.content}`);
+            });
+            setFormattedHtml(doc.documentElement.outerHTML);
+        }
+    }, [attachments, rawHtml]);
 
     return (
         <div className={
@@ -153,33 +264,37 @@ const EmailDisplay = ({email}: Props) => {
             })
         }>
             <div className='flex items-center justify-between gap-2'>
-                <div className="flex items-center justify-between gap-2 h-10 min-w-0 cursor-pointer"
+                <div className="flex items-center justify-between gap-2 h-10 min-w-0 w-auto cursor-pointer"
                 onMouseOver={() => setShowDetails(true)}
                 onMouseLeave={() => setShowDetails(false)}>
-                    <AvatarIcon name={email.from.name} address={email.from.address} style={"h-10 w-10 shrink-0"}/>
+                    <AvatarIcon name={email.from.name} address={email.from.address} style={"h-8 w-8 shrink-0"}/>
                     <span className='whitespace-nowrap truncate min-w-[70px]'>
-                        {isMe ? "Me" : email.from.address}
+                        <div className='text-sm'>
+                            {isMe ? "Me" : email.from.name ?? email.from.address}
+                        </div>
                         {showDetails && (
-                            <div className="absolute w-auto top-8 -ml-1 h-auto bg-accent m-5 rounded-md max-w-[35vw] flex flex-col break-word text-sm border border-gray-300"
+                            <div className="absolute w-auto top-8 -ml-1 h-auto bg-accent m-3 rounded-md max-w-[35vw] flex flex-col text-sm border border-gray-300"
                             onMouseOver={() => setShowDetails(true)}>
-                                <div className='p-2 flex gap-1'>
+                                <div className='p-1 flex'>
                                     <span className='min-w-[50px]'>From: </span>
-                                    {email.from.address}
+                                    <span className="break-words overflow-hidden text-ellipsis whitespace-normal">{email.from.address}</span>
                                 </div>
-                                <div className='p-2 flex gap-1'>
+                                <div className='p-1 flex'>
                                     <span className='min-w-[50px]'>To: </span>
-                                    <span>{email.to.map(to => to.address).join(", ")}</span>
+                                    <span className="break-words overflow-hidden text-ellipsis whitespace-normal">{email.to.map(to => to.address).join(", ")}</span>
                                 </div>
-                                <div className='p-2 flex gap-1'>
-                                    <span className='min-w-[50px]'>CC: </span>
-                                    <span>{email.cc.map(cc => cc.address).join(", ")}</span>
-                                </div>
+                                {email.cc.length > 0 && (
+                                    <div className='p-1 flex'>
+                                        <span className='min-w-[50px]'>CC: </span>
+                                        <span className="break-words overflow-hidden text-ellipsis whitespace-normal">{email.cc.map(cc => cc.address).join(", ")}</span>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </span>
                 </div>
                 {email.sentAt && (
-                    <div className='ml-auto text-sm text-muted-foreground whitespace-nowrap truncate max-w-[150px]'>
+                    <div className='text-xs ml-auto text-muted-foreground whitespace-nowrap truncate max-w-[150px]'>
                         {format(new Date(email.sentAt), "PPp")}
                     </div>
                 )}
@@ -190,15 +305,55 @@ const EmailDisplay = ({email}: Props) => {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align='end'>
-                        <DropdownMenuItem>Mark as unread</DropdownMenuItem>
-                        <DropdownMenuItem>Star thread</DropdownMenuItem>
-                        <DropdownMenuItem>Add label</DropdownMenuItem>
-                        <DropdownMenuItem>Mute thread</DropdownMenuItem>
+                        <DropdownMenuItem className={cn(
+                                "cursor-pointer group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                replyOptions === "reply" && messageId === email.id
+                                    ? "!bg-purple-100 !text-purple-800 hover:!bg-purple-200"
+                                    : "!text-purple-600 hover:!bg-purple-100"
+                            )}
+                            onClick={() => changeReply("reply", email.id)}>
+                                <Reply className='size-3.5 text-inherit'/>
+                                Reply
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className={cn(
+                                "cursor-pointer group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                replyOptions === "replyall" && messageId === email.id
+                                    ? "!bg-purple-200 !text-purple-900 hover:!bg-purple-300"
+                                    : "!text-purple-700 hover:!bg-purple-200"
+                            )}
+                            onClick={() => changeReply("replyall", email.id)}>
+                                <ReplyAll className='size-3.5 text-inherit'/>
+                                Reply All
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className={cn(
+                                "cursor-pointer group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                replyOptions === "forward" && messageId === email.id
+                                    ? "!bg-blue-200 !text-blue-900 hover:!bg-blue-300"
+                                    : "!text-blue-700 hover:!bg-blue-200"
+                            )}
+                            onClick={() => changeReply("forward", email.id)}>
+                                <Forward className='size-3.5 text-inherit'/>
+                                Forward
+                        </DropdownMenuItem>
+                        <DeleteButton email={email} isDeleting={isDeleting} trashEmail={trashEmail} title='Delete Email' description='Are you sure you want to delete this email?' inMail={true}/>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
             <div className="h-4"></div>
-            <Letter html={emailFormat(email?.body ?? "", theme === "dark")} className='rounded-md overflow-auto'/>
+            {email.hasAttachments && (
+                <div className='flex gap-2 p-2 overflow-y-auto mb-8'>
+                    {email.attachments.map((attachment, index) => (
+                        <Attachment key={index} attachment={attachment}/>
+                    ))}
+                </div>
+            )}
+            <div
+            className='rounded-md overflow-auto'
+            dangerouslySetInnerHTML={{ __html: formattedHtml || `<div className='pb-4 flex flex-row items-center justify-center text-center text-muted-foreground gap-2'>
+            <Loader className='size-4 animate-spin' />
+            <div className=''>Loading email...</div>
+            </div>` }}
+            />
         </div>
     )
 }

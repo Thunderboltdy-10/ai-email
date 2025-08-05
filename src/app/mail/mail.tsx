@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { RotateCw } from 'lucide-react'
 import { api } from '@/trpc/react'
 import { dataTagErrorSymbol } from '@tanstack/react-query'
+import { useTheme } from 'next-themes'
 
 type Props = {
     defaultLayout: number[]
@@ -27,6 +28,8 @@ type Props = {
 
 const Mail = ({defaultLayout = [20, 32, 48], navCollapsedSize, defaultCollapsed}: Props) => {
     const {accountId, refetch} = useThreads()
+    const {theme} = useTheme()
+
     const [isCollapsed, setIsCollapsed] = React.useState(false)
     const [done, setDone] = useLocalStorage("email-done", false)
 
@@ -80,7 +83,7 @@ const Mail = ({defaultLayout = [20, 32, 48], navCollapsedSize, defaultCollapsed}
                 }}
                 className={cn(isCollapsed && "min-w-[50px] transition-all duration-300 ease-in-out")}>
                     <div className='flex flex-col h-full flex-1'>
-                        <div className={cn('flex h-[52px] items-center justify-between', isCollapsed? "h-[52px]" : "px-2")}>
+                        <div className={cn('flex h-[52px] items-center justify-center', isCollapsed? "h-[52px]" : "px-2")}>
                             <AccountSwitcher isCollapsed={isCollapsed} />
                         </div>
                         <Separator />
@@ -94,7 +97,8 @@ const Mail = ({defaultLayout = [20, 32, 48], navCollapsedSize, defaultCollapsed}
                 defaultSize={defaultLayout[1]}
                 minSize={30}>
                     <Tabs defaultValue='inbox' value={done? "done" : "inbox"}>
-                        <div className="flex items-center px-4 pt-2">
+                        <div className="flex items-center px-4 pt-2 h-11">
+                            <img src={theme === "dark"? "icon-dark.png" : "icon.png"} className='h-full object-contain' aria-label='mail-icon'/>
                             <h1 className='text-xl font-bold pl-2'>Inbox</h1>
                             <TabsList className='ml-auto'>
                                 <TabsTrigger value='inbox' className='text-zinc-600 dark:text-zinc-200 cursor-pointer' onClick={() => changeDone(false)}>
@@ -104,8 +108,8 @@ const Mail = ({defaultLayout = [20, 32, 48], navCollapsedSize, defaultCollapsed}
                                     Done
                                 </TabsTrigger>
                             </TabsList>
-                            <Button variant="ghost" className={`ml-2 cursor-pointer ${isRefreshing? "animate-spin" : ""}`} onClick={() => refresh()} disabled={isRefreshing}>
-                                <RotateCw className='size-4 text-gray-400' />
+                            <Button variant="ghost" className={`ml-2 cursor-pointer ${isRefreshing ? "animate-spin" : ""}`} onClick={() => refresh()} disabled={isRefreshing}>
+                                <RotateCw className="size-4 text-black dark:text-white" />
                             </Button>
                         </div>
                         <Separator />

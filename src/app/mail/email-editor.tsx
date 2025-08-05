@@ -12,29 +12,33 @@ import { Input } from '@/components/ui/input'
 import AIComposeButton from './ai-compose-button'
 import { generate } from './action'
 import { readStreamableValue } from 'ai/rsc'
+import { useAtom } from 'jotai'
+import { replyType } from './thread-display'
 
 type Props = {
     subject: string
     setSubject: (value: string) => void
 
-    toValues: {label: React.JSX.Element, value: string}[]
-    setToValues: (value: {label: React.JSX.Element, value: string}[]) => void
+    toValues: {label: React.JSX.Element, value: {name: string | null, address: string}}[]
+    setToValues: (value: {label: React.JSX.Element, value: {name: string | null, address: string}}[]) => void
 
-    ccValues: {label: React.JSX.Element, value: string}[]
-    setCcValues: (value: {label: React.JSX.Element, value: string}[]) => void
+    ccValues: {label: React.JSX.Element, value: {name: string | null, address: string}}[]
+    setCcValues: (value: {label: React.JSX.Element, value: {name: string | null, address: string}}[]) => void
 
     to: string[]
 
     handleSend: (value: string) => void
     isSending: boolean
-
+    
     defaultToolbarExpanded?: boolean
 }
 
 const EmailEditor = ({subject, setSubject, toValues, setToValues, ccValues, setCcValues, to, handleSend, isSending, defaultToolbarExpanded}: Props) => {
     const [value, setValue] = React.useState<string>("")
-    const [expanded, setExpanded] = React.useState<boolean>(defaultToolbarExpanded ?? false)
     const [token, setToken] = React.useState<string>("")
+
+    const [expanded, setExpanded] = React.useState<boolean>(defaultToolbarExpanded ?? false)
+    const [replyOptions, setReplyOptions] = useAtom(replyType)
 
     const aiGenerate = async (value: string) => {
         const {output} = await generate(value)
@@ -95,15 +99,15 @@ const EmailEditor = ({subject, setSubject, toValues, setToValues, ccValues, setC
                         <>
                             <TagInput
                             label='To'
-                            onChange={setToValues}
+                            onChange={(newValue) => setToValues(newValue.map(to => ({label: to.label, value: to.data})))}
                             placeholder='Add Recipients'
-                            value={toValues}
+                            value={toValues.map(to => ({label: to.label, value: to.value.address, data: to.value}))}
                             />
                             <TagInput
                             label='Cc'
-                            onChange={setCcValues}
+                            onChange={(newValue) => setCcValues(newValue.map(cc => ({label: cc.label, value: cc.data})))}
                             placeholder='Add Recipients'
-                            value={ccValues}
+                            value={ccValues.map(cc => ({label: cc.label, value: cc.value.address, data: cc.value}))}
                             />
                             <Input id='subject' placeholder='Subject' value={subject}
                             onChange={(e) => setSubject(e.target.value)}/>
@@ -111,14 +115,16 @@ const EmailEditor = ({subject, setSubject, toValues, setToValues, ccValues, setC
                     )}
                     <div className='flex items-center gap-2'>
                         <div className='cursor-pointer' onClick={() => setExpanded(!expanded)}>
-                            <span className="text-green-600 font-medium">
-                                Draft {" "}
+                            <span className={cn("font-medium",
+                                replyOptions === "forward" ? "text-blue-600" : "text-green-600" 
+                            )}>
+                                {replyOptions === "forward" ? "Forward" : "Reply"} {" "}
                             </span>
                             <span>
                                 to {to.join(", ")}
                             </span>
                         </div>
-                        <AIComposeButton isComposing={defaultToolbarExpanded ?? false} onGenerate={onGenerate}/>
+                        <AIComposeButton isComposing={false} onGenerate={onGenerate}/>
                     </div>
                 </div>
                 <div className="w-full px-4 mb-4 overflow-y-auto">
@@ -128,10 +134,10 @@ const EmailEditor = ({subject, setSubject, toValues, setToValues, ccValues, setC
             <Separator />
             <div className='pt-3 pb-9 px-4 flex items-center justify-between shrink-0 sticky'>
                 <span className='text-sm'>
-                    Tip: Press {" "}
-                    <kbd className='px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg'>
+                    Tip: Press {"  "}
+                    <kbd className='px-2 py-1.5 text-xs font-semibold text-black bg-gray-100 rounded-lg ai-bg'>
                         Ctrl + J
-                    </kbd> {" "}
+                    </kbd> {"  "}
                     for AI autocomplete
                 </span>
                 <Button onClick={async () => {

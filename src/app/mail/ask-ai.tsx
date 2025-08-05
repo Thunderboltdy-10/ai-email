@@ -58,7 +58,7 @@ const AskAI = ({isCollapsed} : {isCollapsed: boolean}) => {
                             <p className='text-gray-500 text-xs dark:text-gray-400'>Get answers to your questions about your emails</p>
                         </div>
                         {messages.length === 0 && (
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap mt-2">
                                 <span className='px-2 py-1 bg-gray-800 dark:bg-gray-500 text-gray-200 rounded-md text-xs cursor-pointer'
                                 onClick={() => {
                                     handleInputChange({

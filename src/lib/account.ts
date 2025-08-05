@@ -64,8 +64,8 @@ export class Account {
             let storedDeleteDeltaToken: string = syncResponse.syncDeletedToken
 
             let updatedResponse = await this.getUpdatedEmails({deltaToken: storedUpdateDeltaToken})
-            if (updatedResponse.updateDeltaToken) {
-                storedUpdateDeltaToken = updatedResponse.updateDeltaToken
+            if (updatedResponse.nextDeltaToken) {
+                storedUpdateDeltaToken = updatedResponse.nextDeltaToken
             }
 
             let allEmails : EmailMessage[] = updatedResponse.records
@@ -74,8 +74,8 @@ export class Account {
                 updatedResponse = await this.getUpdatedEmails({pageToken: updatedResponse.nextPageToken})
                 allEmails = allEmails.concat(updatedResponse.records)
 
-                if (updatedResponse.updateDeltaToken) { 
-                    storedUpdateDeltaToken = updatedResponse.updateDeltaToken
+                if (updatedResponse.nextDeltaToken) { 
+                    storedUpdateDeltaToken = updatedResponse.nextDeltaToken
                 }
             }
 
@@ -108,15 +108,15 @@ export class Account {
         let storedUpdateDeltaToken = account.updateDeltaToken
         let allEmails: EmailMessage[] = response.records
 
-        if (response.updateDeltaToken) {
-            storedUpdateDeltaToken = response.updateDeltaToken
+        if (response.nextDeltaToken) {
+            storedUpdateDeltaToken = response.nextDeltaToken
         }
 
         while (response.nextPageToken) {
             response = await this.getUpdatedEmails({pageToken: response.nextPageToken})
             allEmails = allEmails.concat(response.records)
-            if (response.updateDeltaToken) {
-                storedUpdateDeltaToken = response.updateDeltaToken
+            if (response.nextDeltaToken) {
+                storedUpdateDeltaToken = response.nextDeltaToken
             }
         }
 
@@ -152,15 +152,15 @@ export class Account {
         let storedDeleteDeltaToken = account.deleteDeltaToken
         let allEmails: EmailMessage[] = response.records
 
-        if (response.deleteDeltaToken) {
-            storedDeleteDeltaToken = response.deleteDeltaToken
+        if (response.nextDeltaToken) {
+            storedDeleteDeltaToken = response.nextDeltaToken
         }
 
         while (response.nextPageToken) {
             response = await this.getDeletedEmails({pageToken: response.nextPageToken})
             allEmails = allEmails.concat(response.records)
-            if (response.deleteDeltaToken) {
-                storedDeleteDeltaToken = response.deleteDeltaToken
+            if (response.nextDeltaToken) {
+                storedDeleteDeltaToken = response.nextDeltaToken
             }
         }
 
@@ -173,13 +173,13 @@ export class Account {
         await db.account.update({
             where: {id: account.id},
             data: {
-                updateDeltaToken: storedDeleteDeltaToken
+                deleteDeltaToken: storedDeleteDeltaToken
             }
         })
 
         return {
             emails: allEmails,
-            updateDeltaToken: storedDeleteDeltaToken
+            deleteDeltaToken: storedDeleteDeltaToken
         }
     }
 
@@ -234,6 +234,95 @@ export class Account {
             } else {
                 console.error("Error sending email:", error)
             }
+        }
+    }
+
+    async replyEmail({
+        from,
+        subject,
+        body,
+        inReplyTo,
+        messageId,
+        references,
+        to,
+        cc,
+        bcc,
+        replyTo
+    }: {
+       from: EmailAddress,
+       subject: string,
+       body: string,
+       inReplyTo?: string,
+       messageId: string,
+       references?: string,
+       to: EmailAddress[],
+       cc?: EmailAddress[],
+       bcc?: EmailAddress[],
+       replyTo?: EmailAddress,
+    }) {
+        try {
+            const response = await axios.post(`https://api.aurinko.io/v1/email/messages/${messageId}/reply`, {
+                from,
+                subject,
+                body,
+                to,
+                cc,
+                bcc,
+                replyTo: [replyTo]
+            }, {
+                params: {
+                    returnIds: true
+                },
+                headers: {
+                    Authorization: `Bearer ${this.token}`
+                }
+            })
+            console.log("Email sent", response.data)
+            return response.data
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error("Error sending email:", JSON.stringify(error.response?.data, null, 2))
+            } else {
+                console.error("Error sending email:", error)
+            }
+        }
+    }
+
+    async deleteEmail (accessToken: string, messageId: string) {
+        try {
+            const response = await axios.delete(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`
+                }
+            })
+            return response.data as {
+                status: string
+            }
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error("Error deleting email:", error.response?.data)
+            } else {
+                console.error("Unexpected error deleting email:", error)
+            }
+            throw error
+        }
+    }
+
+    async setAttachment (messageId: string, attachmentId: string) {
+        try {
+            const response = await axios.get(`https://api.aurinko.io/v1/email/messages/${messageId}/attachments/${attachmentId}`, {
+                headers: {
+                    "Authorization": `Bearer ${this.token}`
+                }
+            })
+            return response.data
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                console.error("Error getting attachment:", error.response?.data)
+            } else {
+                console.error("Unexpected error getting attachment:", error)
+            }
+            throw error
         }
     }
 }

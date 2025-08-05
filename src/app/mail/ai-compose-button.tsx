@@ -57,24 +57,25 @@ const AIComposeButton = (props: Props) => {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="icon" variant={"outline"} onClick={() => setOpen(true)}>
-                    <Bot className='size-5' />
+                <Button size="icon" variant={"outline"} onClick={() => setOpen(true)} className='cursor-pointer ai-bg ml-auto'>
+                    <Bot className='size-5 text-black' />
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className='ai-border'>
                 <DialogHeader>
-                <DialogTitle>AI Smart Compose</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className='text-center'>AI Smart Compose</DialogTitle>
+                <div className="h-1"></div>
+                <DialogDescription className='text-center'>
                     AI will help you compose your email.
                 </DialogDescription>
-                <div className="h-2"></div>
+                <div className="h-1"></div>
                 <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Enter a prompt'/>
                 <div className="h-2"></div>
                 <Button onClick={() => {
                     setOpen(false)
                     setPrompt("")
                     aiGenerate()
-                }}>
+                }} className='cursor-pointer'>
                     Generate
                 </Button>
                 </DialogHeader>

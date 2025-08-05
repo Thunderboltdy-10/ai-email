@@ -3,13 +3,14 @@ import useThreads from '@/hooks/use-threads'
 import { api } from '@/trpc/react'
 import React from 'react'
 import Select from "react-select"
+import Creatable from "react-select/creatable"
 
 type Props = {
     placeholder: string
     label: string
 
-    onChange: (values: {label: React.JSX.Element, value: string}[]) => void
-    value: {label: React.JSX.Element, value: string}[]
+    onChange: (values: {label: React.JSX.Element, value: string, data: {name: string | null, address: string}}[]) => void
+    value: {label: React.JSX.Element, value: string, data: {name: string | null, address: string}}[]
 }
 
 const TagInput = ({placeholder, label, onChange, value}: Props) => {
@@ -26,7 +27,8 @@ const TagInput = ({placeholder, label, onChange, value}: Props) => {
                 {suggestion.address}
             </span>
         ),
-        value: suggestion.address
+        value: suggestion.address,
+        data: {name: suggestion.name, address: suggestion.address}
     }))
 
     return (
@@ -41,11 +43,18 @@ const TagInput = ({placeholder, label, onChange, value}: Props) => {
             onChange={onChange}
             className='w-full flex-1'
             // @ts-ignore
-            options={inputValue ? options?.concat({
-                // @ts-ignore
-                label: inputValue,
-                value: inputValue
-            }) : options}
+            options={inputValue != "" && !options?.some(option => option.value.includes(inputValue)) ? options?.concat({
+                label: (
+                    <span className='flex items-center gap-2'>
+                        <AvatarIcon name={inputValue} address={inputValue} style={"h-8 w-8 text-sm"}/>
+                        {inputValue}
+                    </span>
+                ),
+                value: inputValue,
+                data: {name: inputValue, address: inputValue}
+            })
+                : options
+            }
             placeholder={placeholder}
             isMulti
             classNames={{
@@ -56,13 +65,13 @@ const TagInput = ({placeholder, label, onChange, value}: Props) => {
                     return "dark:!text-gray-300"
                 },
                 multiValue: () => {
-                    return "dark:!bg-gray-700"
+                    return "text-gray-900 !bg-blue-100 dark:!bg-gray-900"
                 },
                 multiValueLabel: () => {
-                    return "dark:!text-white dark:!bg-gray-700 rounded-md"
+                    return "!text-gray-900 dark:!text-white dark:!bg-gray-900 rounded-md"
                 },
                 option: () => {
-                    return "dark:!text-white dark:!bg-gray-700"
+                    return "dark:!text-white dark:!bg-gray-700 dark:hover:!bg-gray-900 !cursor-pointer"
                 },
                 menuList: () => {
                     return "!p-0"

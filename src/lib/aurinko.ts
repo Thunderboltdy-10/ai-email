@@ -84,26 +84,6 @@ export const getAccountDetails = async (accessToken: string) => {
     }
 }
 
-export const deleteEmail = async (accessToken: string, messageId: string) => {
-    try {
-        const response = await axios.delete(`https://api.aurinko.io/v1/email/messages/${messageId}`, {
-            headers: {
-                "Authorization": `Bearer ${accessToken}`
-            }
-        })
-        return response.data as {
-            status: string
-        }
-    } catch (error) {
-        if (axios.isAxiosError(error)) {
-            console.error("Error deleting email:", error.response?.data)
-        } else {
-            console.error("Unexpected error deleting email:", error)
-        }
-        throw error
-    }
-}
-
 export const pushNotification = async (accessToken: string) => {
     try {
         const response = await axios.post("https://api.aurinko.io/v1/subscriptions", {

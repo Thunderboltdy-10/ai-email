@@ -7,12 +7,12 @@ export interface SyncResponse {
 }
 export interface SyncUpdatedResponse {
     nextPageToken?: string;
-    updateDeltaToken: string;
+    nextDeltaToken: string;
     records: EmailMessage[];
 }
 export interface SyncDeletedResponse {
     nextPageToken?: string;
-    deleteDeltaToken: string;
+    nextDeltaToken: string;
     records: EmailMessage[];
 }
 

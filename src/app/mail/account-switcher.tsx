@@ -24,14 +24,14 @@ const AccountSwitcher = ({isCollapsed}: Props) => {
             <SelectTrigger className={cn(
                 "flex w-full flex-1 items-center gap-2 [&>span]:line-clamp-1 [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-1 [&>span]:truncate [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
                 isCollapsed &&
-                "flex items-center justify-center m-[18px] p-0 [&>span]:w-auto [&>svg]:hidden border-none focus:ring-0 focus:outline-none rounded-lg"
+                "flex items-center justify-center p-0 [&>span]:w-auto [&>svg]:hidden border-none focus:ring-0 focus:outline-none rounded-4xl gap-0 w-10 h-10 flex-0"
             )}
             aria-label="Select account">
                 <SelectValue placeholder="Select an account">
                     <span className={cn({"hidden": !isCollapsed})}>
                         <AvatarIcon name={data.find(account => account.id === accountId)?.name} address={data.find(account => account.id === accountId)?.emailAddress} style='h-10 w-10'/>
                     </span>
-                    <span className={cn({"hidden": isCollapsed, "ml-2": true})}>
+                    <span className={cn({"hidden": isCollapsed})}>
                         {data.find(account => account.id === accountId)?.emailAddress}
                     </span>
                 </SelectValue>

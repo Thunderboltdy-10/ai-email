@@ -94,16 +94,16 @@ async function upsertEmail(email: EmailMessage, accountId: string, index: number
                     ...toAddresses.map(a => a!.id), 
                     ...ccAddresses.map(a => a!.id),
                     ...bccAddresses.map(a => a!.id)
-                ])]
+                ])],
             },
             create: {
                 id: email.threadId,
                 accountId,
                 subject: email.subject,
                 done: false,
-                draftStatus: emailLabelType === 'draft',
                 inboxStatus: emailLabelType === 'inbox',
                 sentStatus: emailLabelType === 'sent',
+                draftStatus: emailLabelType === 'draft',
                 lastMessageDate: new Date(email.sentAt),
                 participantIds: [...new Set([
                     fromAddress.id,
@@ -188,7 +188,8 @@ async function upsertEmail(email: EmailMessage, accountId: string, index: number
         for (const threadEmail of threadEmails) {
             if (threadEmail.emailLabel === 'inbox') {
                 threadFolderType = 'inbox'
-                break
+            } else if (threadEmail.emailLabel === "sent") {
+                threadFolderType = 'sent'
             } else if (threadEmail.emailLabel === 'draft') {
                 threadFolderType = 'draft'
             }
@@ -214,8 +215,21 @@ async function upsertEmail(email: EmailMessage, accountId: string, index: number
 
 async function upsertAttachment(emailId: string, attachment: EmailAttachment) {
     try {
+        const attachments = await db.emailAttachment.findMany({
+            where: {
+                emailId,
+                contentId: attachment.contentId,
+                size: attachment.size,
+                mimeType: attachment.mimeType
+            }
+        })
+
+        if (attachments.length > 0) {
+            return
+        }
+        
         await db.emailAttachment.upsert({
-            where: { id: attachment.id ?? "" },
+            where: { id: attachment.id ?? ""},
             update: {
                 name: attachment.name,
                 mimeType: attachment.mimeType,

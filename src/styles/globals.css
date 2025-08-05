@@ -153,6 +153,8 @@
             transform: translateX(0);
         }
     }
+
+    
 }
 
 @layer utilities {
@@ -174,4 +176,25 @@
     background-color: #dadada;
     border-radius: 4px;
     padding: 0px 2px;
+}
+
+.ai-bg {
+    background: linear-gradient(to bottom right, #F55C7A 0%, #F6BC66 100%) border-box;
+    animation: ai-rotate 10s linear infinite;
+}
+
+.ai-border {
+    border: 3px solid transparent;
+    background: linear-gradient(var(--color-background), var(--color-background)) padding-box,
+                linear-gradient(to bottom right, #F55C7A 0%, #F6BC66 100%) border-box;
+    animation: ai-rotate 10s linear infinite;
+}
+
+@keyframes ai-rotate {
+    from {
+        filter: hue-rotate(0deg);
+    }
+    to {
+        filter: hue-rotate(360deg);
+    }
 }

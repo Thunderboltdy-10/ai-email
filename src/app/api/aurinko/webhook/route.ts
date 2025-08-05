@@ -7,7 +7,7 @@ import useThreads from "@/hooks/use-threads"
 export async function handleNotification(payload: any) {
     const accountId = payload.accountId.toString()
 
-    const acc = await db.account.findUnique({
+    const account = await db.account.findUnique({
         where: {
             id: accountId
         },
@@ -16,15 +16,22 @@ export async function handleNotification(payload: any) {
         }
     })
 
-    if (!acc) return
+    if (!account) return
 
-    const accessToken = acc.accessToken
+    const accessToken = account.accessToken
 
-    const account = new Account(accessToken)
+    const acc = new Account(accessToken)
 
     if (payload.payloads[0].changeType === "deleted") {
+        const messageId = payload.payloads[0].id
+
+        // await acc.deleteEmail(
+        //     accountId,
+
+        // )
     }
-    account.syncEmails().catch(console.error)
+
+    acc.syncEmails().catch(console.error)
 }
 
 export async function POST(req: Request) {

@@ -11,15 +11,18 @@ import { atom, useAtom } from 'jotai'
 import { Loader } from 'lucide-react'
 import { isSearchingAtom } from './search-bar'
 import { api } from '@/trpc/react'
-import { changedDone } from './thread-display'
+import { changedDone, currentMessage, replyType } from './thread-display'
 import { OFFSET_PER_FETCH, STARTING_OFFSET } from '@/constants'
 
 export const offsetNumAtom = atom(STARTING_OFFSET)
 
 const ThreadList = ({right}: {right?: boolean}) => {
     const {threads, threadId, setThreadId, accountId, refetch, isLoading} = useThreads()
+    
     const [offsetAtom, setOffsetAtom] = useAtom(offsetNumAtom)
     const [isSearching, setIsSearching] = useAtom(isSearchingAtom)
+    const [replyOptions, setReplyOptions] = useAtom(replyType)
+    const [messageId, setMessageId] = useAtom(currentMessage)   
 
     const [hasMore, setHasMore] = React.useState<boolean>(true)
     
@@ -103,6 +106,9 @@ const ThreadList = ({right}: {right?: boolean}) => {
                         {threads.map(thread => {
                             return <button
                                 onClick={(() => {
+                                    setMessageId(undefined)
+                                    setReplyOptions("reply")
+                                    
                                     setIsSearching(false)
                                     if (threadId === thread.id) {
                                         setThreadId(null)
@@ -118,7 +124,7 @@ const ThreadList = ({right}: {right?: boolean}) => {
                                                 removeLabel: "unread"
                                             })
                                         })
-                                        refetch()
+                                        setTimeout(() => refetch(), 500)
                                     }
                                 })}
                                 key={thread.id}
@@ -132,8 +138,11 @@ const ThreadList = ({right}: {right?: boolean}) => {
                                 <div className='flex flex-col w-full gap-2'>
                                     <div className="flex items-center gap-3">
                                         <div className="flex items-center gap-2 line-clamp-1">
+                                            {thread.emails.some(email => email?.sysLabels.includes("unread")) && (
+                                                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                            )}
                                             <div className="font-semibold">
-                                                {thread.emails.at(-1)?.from.name}
+                                                {thread.emails.at(-1)?.from.name ?? thread.emails.at(-1)?.from.address}
                                             </div>
                                         </div>
                                         <div className={
