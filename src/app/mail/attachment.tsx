@@ -85,13 +85,13 @@ const Attachment = ({attachment}: {attachment: RouterOutputs["account"]["getThre
                 <div className='w-full h-full flex items-center justify-center'>
                     {attachment.content ? (
                         attachment.mimeType.includes("image") ? (
-                            <img src={`data:${attachment.mimeType};base64,${attachment.content}`} alt={attachment.name} className="max-w-full h-auto"/>
+                            <img src={`data:${attachment.mimeType};base64,${attachment.content}`} alt={attachment.name} className="h-fit max-h-[85vh] max-w-[85vw]"/>
                         ) : attachment.mimeType.includes("pdf") ? (
                             <embed src={`data:${attachment.mimeType};base64,${attachment.content}#view=FitH&toolbar=1&navpanes=0`} type={attachment.mimeType} className='h-[85vh] w-[85vw]' />
                         ) : attachment.mimeType.includes("document") ? (
                             <div dangerouslySetInnerHTML={{ __html: docxHtml ?? `<div className='pb-4 flex flex-row items-center justify-center text-center text-muted-foreground gap-2'>
                             <Loader className='size-4 animate-spin' />
-                            <div className=''>Loading previous emails...</div>
+                            <div className=''>Loading document...</div>
                             </div>` }} className="prose" />
                         ) : (
                             <pre className="whitespace-pre-wrap text-sm max-h-96 overflow-auto">{attachment.content}</pre>
@@ -99,7 +99,7 @@ const Attachment = ({attachment}: {attachment: RouterOutputs["account"]["getThre
                     ): (
                         <div className='pb-4 flex flex-row items-center justify-center text-center text-muted-foreground gap-2'>
                             <Loader className='size-4 animate-spin' />
-                            <div className=''>Loading previous emails...</div>
+                            <div className=''>Loading attachment...</div>
                         </div>
                     )}
                 </div>

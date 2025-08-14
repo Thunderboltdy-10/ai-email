@@ -32,16 +32,19 @@ const ThreadList = ({right}: {right?: boolean}) => {
 
     const [tab] = useLocalStorage<"inbox" | "draft" | "sent">("email-tab", "inbox")
     const [done] = useLocalStorage("email-done", false)
+    const [filters] = useLocalStorage<string[]>("email-filters", ["important"])
 
     const changeRead = api.account.changeRead.useMutation()
 
     const groupedThreads = React.useMemo(() => {
         return threads?.reduce((acc, thread) => {
             const date = format(thread.emails[thread.emails.length - 1]?.sentAt ?? new Date(), "yyyy-MM-dd")
-            if (!acc[date]) {
-                acc[date] = []
+            if (filters.length === 0 || thread.emails.some(email => email.sysLabels.some(label => filters.includes(label))) || (filters.includes("promotions") && !thread.emails.some(email => email.sysLabels.includes("important")))) {
+                if (!acc[date]) {
+                    acc[date] = []
+                }
+                acc[date].push(thread)
             }
-            acc[date].push(thread)
             return acc
         }, {} as Record<string, typeof threads>)
     }, [threads])
@@ -63,7 +66,7 @@ const ThreadList = ({right}: {right?: boolean}) => {
 
         const { scrollTop, clientHeight, scrollHeight } = el
 
-        if (scrollTop + clientHeight >= scrollHeight) {
+        if (scrollTop + clientHeight >= scrollHeight || scrollHeight <= clientHeight) {
             setLoading(true)
             throttledScrollMessages()
         }
@@ -72,6 +75,10 @@ const ThreadList = ({right}: {right?: boolean}) => {
     React.useEffect(() => {
         groupedThreads
     }, [])
+
+    React.useEffect(() => {
+        handleScroll()
+    }, [filters])
 
     React.useEffect(() => {
         setLoading(false)

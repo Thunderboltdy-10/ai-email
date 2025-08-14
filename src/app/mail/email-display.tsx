@@ -159,6 +159,27 @@ const EmailDisplay = ({email}: Props) => {
     const deleteMail = api.account.deleteMail.useMutation()
     const deleteThread = api.account.deleteThread.useMutation()
 
+    const triggerRef = React.useRef<HTMLDivElement | null>(null)
+    const overlayRef = React.useRef<HTMLDivElement | null>(null)
+
+    const [pos, setPos] = React.useState({ left: 0, top: 0 })
+
+    const calculatePosition = React.useCallback(() => {
+        const rect = triggerRef.current?.getBoundingClientRect()
+        if (!rect) return
+
+        setPos({ left: Math.max(10, rect.left), top: rect.bottom + 10 })
+    }, []);
+
+    const openDetails = React.useCallback(() => {
+        setShowDetails(true)
+        calculatePosition()
+    }, [calculatePosition])
+
+    const closeDetails = React.useCallback(() => {
+        setShowDetails(false)
+    }, [])
+
     const changeReply = (option: string, id: string) => {
         setReplyOptions(option)
         setMessageId(id)
@@ -247,15 +268,41 @@ const EmailDisplay = ({email}: Props) => {
         const allLoaded = attachments.every(att => att.content !== null)
 
         if (allLoaded) {
-            const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+            const doc = new DOMParser().parseFromString(rawHtml, "text/html")
 
             attachments.forEach(att => {
-                const img = doc.querySelector(`img[src="cid:${att.contentId}"]`);
-                if (img) img.setAttribute("src", `data:${att.mimeType};base64,${att.content}`);
+                const img = doc.querySelector(`img[src="cid:${att.contentId}"]`)
+                if (img) img.setAttribute("src", `data:${att.mimeType};base64,${att.content}`)
             });
-            setFormattedHtml(doc.documentElement.outerHTML);
+            setFormattedHtml(doc.documentElement.outerHTML)
         }
-    }, [attachments, rawHtml]);
+    }, [attachments, rawHtml])
+
+    React.useLayoutEffect(() => {
+        if (!showDetails) return
+        const overlay = overlayRef.current
+        const trigger = triggerRef.current
+        if (!overlay || !trigger) return
+
+        const rect = trigger.getBoundingClientRect()
+        const overlayRect = overlay.getBoundingClientRect()
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+
+        let left = rect.left
+        if (left + overlayRect.width + 12 > vw) {
+            left = Math.max(8, vw - overlayRect.width - 12)
+        }
+
+        let top = rect.bottom + 8
+        if (top + overlayRect.height + 8 > vh) {
+            top = rect.top - overlayRect.height - 8
+            if (top < 8) top = 8
+        }
+
+        setPos({ left, top })
+    }, [showDetails, email])
+
 
     return (
         <div className={
@@ -265,31 +312,73 @@ const EmailDisplay = ({email}: Props) => {
         }>
             <div className='flex items-center justify-between gap-2'>
                 <div className="flex items-center justify-between gap-2 h-10 min-w-0 w-auto cursor-pointer"
-                onMouseOver={() => setShowDetails(true)}
-                onMouseLeave={() => setShowDetails(false)}>
+                onMouseOver={openDetails}
+                onMouseLeave={closeDetails}>
                     <AvatarIcon name={email.from.name} address={email.from.address} style={"h-8 w-8 shrink-0"}/>
                     <span className='whitespace-nowrap truncate min-w-[70px]'>
-                        <div className='text-sm'>
+                        <div className='text-sm' ref={triggerRef}>
                             {isMe ? "Me" : email.from.name ?? email.from.address}
                         </div>
-                        {showDetails && (
-                            <div className="absolute w-auto top-8 -ml-1 h-auto bg-accent m-3 rounded-md max-w-[35vw] flex flex-col text-sm border border-gray-300"
-                            onMouseOver={() => setShowDetails(true)}>
-                                <div className='p-1 flex'>
-                                    <span className='min-w-[50px]'>From: </span>
-                                    <span className="break-words overflow-hidden text-ellipsis whitespace-normal">{email.from.address}</span>
-                                </div>
-                                <div className='p-1 flex'>
-                                    <span className='min-w-[50px]'>To: </span>
-                                    <span className="break-words overflow-hidden text-ellipsis whitespace-normal">{email.to.map(to => to.address).join(", ")}</span>
-                                </div>
-                                {email.cc.length > 0 && (
-                                    <div className='p-1 flex'>
-                                        <span className='min-w-[50px]'>CC: </span>
-                                        <span className="break-words overflow-hidden text-ellipsis whitespace-normal">{email.cc.map(cc => cc.address).join(", ")}</span>
+                        {showDetails && ReactDOM.createPortal(
+                            <div
+                                ref={overlayRef}
+                                onMouseEnter={openDetails}
+                                onMouseLeave={closeDetails}
+                                style={{
+                                    position: "fixed",
+                                    left: pos.left,
+                                    top: pos.top,
+                                    zIndex: 9999,
+                                    minWidth: 220,
+                                    maxWidth: "min(35vw, 520px)"
+                                }}
+                                className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-lg rounded-md text-sm text-slate-800 dark:text-slate-100 overflow-hidden"
+                            >
+                                <div className="p-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">From</div>
+                                            <div className="break-words font-medium truncate">
+                                                {isMe ? "Me" : email.from.name ?? email.from.address}
+                                            </div>
+                                            <div className="text-xs break-words text-slate-600 dark:text-slate-300">
+                                                {email.from.address}
+                                            </div>
+                                        </div>
+                                        <div className="flex-shrink-0 ml-2 self-center">
+                                            <button
+                                                onClick={() => {
+                                                    try {
+                                                        navigator.clipboard.writeText(email.from.address)
+                                                        toast.success("Copied")
+                                                    } catch { /* ignore */ }
+                                                }}
+                                                type='button'
+                                                className="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 cursor-pointer"
+                                            >
+                                                Copy
+                                            </button>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
+                                    <hr className="my-2 border-slate-100 dark:border-slate-700" />
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">To</div>
+                                    <div className="mb-2 break-words">
+                                        <span className="text-slate-700 dark:text-slate-200">
+                                            {email.to.map((t) => t.address).join(", ")}
+                                        </span>
+                                    </div>
+                                    {email.cc?.length > 0 && (
+                                        <>
+                                            <hr className="my-2 border-slate-100 dark:border-slate-700" />
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">CC</div>
+                                            <div className="mb-1 break-words text-slate-700 dark:text-slate-200">
+                                                {email.cc.map((c) => c.address).join(", ")}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>,
+                            document.body
                         )}
                     </span>
                 </div>
